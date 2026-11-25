@@ -1,0 +1,16 @@
+{
+  "name": "sbi-my-assets-plus",
+  "version": "0.1.0-dev.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "csv-parse": "^7.0.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
