@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { downloadUrl, fetchBalances, fetchStatement, readStatement } from "../src/sbi.ts";
+import { fetchBalances, fetchStatement, readStatement, readStatementPage } from "../src/sbi.ts";
 
 const range = { start: "2040-01-01", end: "2040-01-31" };
 const csv = [
@@ -12,10 +12,6 @@ const csv = [
 ].join("\n");
 
 test("SBIの一括照会期間・件数・入出金方向を照合する", () => {
-  const url = new URL(downloadUrl(range));
-  assert.equal(url.searchParams.get("depositDateTo"), "20400131");
-  assert.equal(url.searchParams.get("pageNumber"), "0");
-  assert.equal(url.searchParams.get("pageSize"), "-1");
   assert.deepEqual(readStatement(csv, range).map(x => [x.kind, x.yen]), [["deposit", 200000], ["unknown", 120]]);
   for (const bad of [csv.replace(",2,", ",3,"), csv.replace("入金：すべて", "絞り込み"),
     csv.replace("2040/01/31", "2040/01/30"), csv.replace(",120,0", ",120,120"), "<html>Login</html>"]) {
@@ -23,8 +19,26 @@ test("SBIの一括照会期間・件数・入出金方向を照合する", () =>
   }
 });
 
+const records = [
+  { payDepDate: "2040/01/12", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "架空の入金", payAmount: "200,000" },
+  { payDepDate: "2040/01/14", payDepKbn: "出金", detailKbn: "その他", dispAbstract: "架空の<br/>振替", payAmount: "120" }
+];
+const page = {
+  totalCount: 2, pageNumber: 1, pageCount: 1, pageSize: 10, detailsConditions: ["入金：すべて", "出金：すべて"],
+  exceededMaxCount: false, isExceededMaxCount: false, depositRecordList: records
+};
+
+test("一覧JSONの方向・円金額・摘要を正規化し、途中のページや不完全な照会を検出する", () => {
+  assert.deepEqual(readStatementPage(page, range, 1).rows, readStatement(csv.replace("架空の振替", "架空の 振替"), range));
+  for (const changes of [{ pageNumber: 2 }, { exceededMaxCount: true }, { detailsConditions: ["入金：すべて"] },
+    { depositRecordList: [{ ...records[1], payAmount: "" }] },
+    { depositRecordList: [{ ...records[0], payDepDate: "2039/01/01" }] }]) {
+    assert.throws(() => readStatementPage({ ...page, ...changes }, range, 1));
+  }
+});
+
 test("明細の取得と検証の失敗を区別し、応答本文や転送先をエラーに含めない", async t => {
-  let response = { status: 200, response: new TextEncoder().encode(csv).buffer };
+  let response = { status: 200, response: page };
   globalThis.GM = { xmlHttpRequest: async () => response };
   t.after(() => { delete globalThis.GM; });
   assert.equal((await fetchStatement(range)).length, 2);
@@ -32,13 +46,11 @@ test("明細の取得と検証の失敗を区別し、応答本文や転送先�
     [{ status: 403 }, /HTTP 403/],
     [{ status: 0 }, /HTTP応答/],
     [{ finalUrl: "https://example.invalid/private-fixture" }, /転送/],
-    [{ response: "<html>private-fixture</html>" }, /HTML/],
-    [{ response: '{"reason":"private-fixture"}' }, /JSON/],
-    [{ response: new ArrayBuffer(0) }, /応答が空/],
-    [{ response: "private-fixture" }, /照会条件の見出し/],
-    [{ response: csv.replace("200000", "private-fixture") }, /金額欄/]
+    [{ response: { reason: "private-fixture" } }, /JSON/],
+    [{ response: null }, /JSON/],
+    [{ response: { ...page, depositRecordList: [{ ...records[0], payAmount: "private-fixture" }] } }, /金額/]
   ]) {
-    response = { status: 200, response: csv, ...changes };
+    response = { status: 200, response: page, ...changes };
     await assert.rejects(fetchStatement(range), e => expected.test(e.message) && !e.message.includes("private-fixture"));
   }
   globalThis.GM.xmlHttpRequest = async () => { throw new Error("private-fixture"); };

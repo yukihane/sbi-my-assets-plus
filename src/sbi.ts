@@ -1,17 +1,6 @@
-import { csvRows, decodeCsv, yen } from "./csv.ts";
+import { csvRows, yen } from "./csv.ts";
+import { collectStatementPages, statementPageUrl, statementPageSize } from "./statement-pages.ts";
 import type { Coverage, Flow, FlowKind } from "./analytics.ts";
-
-export const downloadPath = "https://member.c.sbisec.co.jp/banking/api/yen/detail/download";
-
-export function downloadUrl(range: Coverage) {
-  const url = new URL(downloadPath);
-  url.search = new URLSearchParams({
-    depositDateFrom: range.start.replaceAll("-", ""), depositDateTo: range.end.replaceAll("-", ""),
-    payDepKbnList: "1,2,6,5", detailKbnList: "11,12,13,14,15,16,17,18,21,22,23,24",
-    sortDateType: "1", pageNumber: "0", pageSize: "-1", totalCountKbn: "1"
-  }).toString();
-  return url.href;
-}
 
 function classify(category: string, detail: string, incoming: boolean): FlowKind {
   if (category === "金融機関からの入金" && incoming) return "deposit";
@@ -65,41 +54,78 @@ export function readStatement(csv: string, requested: Coverage): Statement[] {
   });
 }
 
-type DownloadResponse = { status: number; response: ArrayBuffer | string | null; finalUrl?: string };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function readStatementPage(data: unknown, range: Coverage, number: number) {
+  if (!isRecord(data) || !Array.isArray(data.depositRecordList) || typeof data.totalCount !== "number") {
+    throw new Error("明細一覧のJSONに明細または総件数がありません。円貨入出金明細画面で照会できるか確認してください。");
+  }
+  if (data.exceededMaxCount === true || data.isExceededMaxCount === true) {
+    throw new Error("明細が照会上限を超えています。照会期間を短くしてください。");
+  }
+  const total = data.totalCount;
+  if (!Number.isSafeInteger(total) || total < 0 || data.pageNumber !== number ||
+      data.pageSize !== statementPageSize ||
+      (data.pageCount !== Math.ceil(total / statementPageSize) && !(total === 0 && data.pageCount === 1))) {
+    throw new Error("明細一覧のページ情報が照会条件と一致しません。");
+  }
+  const conditions = data.detailsConditions;
+  if (!Array.isArray(conditions) || conditions.length !== 2 ||
+      !["入金:すべて", "出金:すべて"].every(label =>
+        conditions.some(value => typeof value === "string" && value.normalize("NFKC") === label))) {
+    throw new Error("全入出金を対象とする明細一覧を確認できません。");
+  }
+  const rows: Statement[] = data.depositRecordList.map((row: unknown) => {
+    if (!isRecord(row) || typeof row.payDepDate !== "string" || typeof row.payAmount !== "string" ||
+        typeof row.detailKbn !== "string" || typeof row.dispAbstract !== "string" ||
+        (row.payDepKbn !== "入金" && row.payDepKbn !== "出金")) {
+      throw new Error("明細一覧の日付・取引区分・金額の形式を確認してください。");
+    }
+    const date = row.payDepDate.replaceAll("/", "-");
+    if (!/^\d{4}-\d\d-\d\d$/.test(date) || new Date(date).toJSON()?.slice(0, 10) !== date ||
+        date < range.start || date > range.end) throw new Error("明細一覧の日付が不正または照会期間外です。");
+    let amount;
+    try {
+      amount = yen(row.payAmount);
+      if (amount === null) throw new Error();
+    } catch {
+      throw new Error("明細一覧の金額を円単位で読み取れません。");
+    }
+    const incoming = row.payDepKbn === "入金";
+    const detail = row.dispAbstract.replace(/<br\s*\/?\s*>/gi, " ").replace(/\s+/gu, " ").trim();
+    return { date, yen: amount, incoming, kind: classify(row.detailKbn, detail, incoming),
+      description: row.detailKbn + "／" + detail };
+  });
+  return { total, rows };
+}
+
+type QueryResponse = { status: number; response: unknown; finalUrl?: string };
 declare const GM: {
-  xmlHttpRequest(options: { method: "GET"; url: string; responseType: "arraybuffer"; timeout: number }):
-    Promise<DownloadResponse>;
+  xmlHttpRequest(options: { method: "GET"; url: string; responseType: "json"; timeout: number }):
+    Promise<QueryResponse>;
 };
 
 export async function fetchStatement(range: Coverage) {
   if (typeof GM === "undefined" || typeof GM.xmlHttpRequest !== "function") {
     throw new Error("入出金明細の通信機能が使えません。Tampermonkeyでスクリプトの権限を確認してください。");
   }
-  let response: DownloadResponse;
-  try {
-    response = await GM.xmlHttpRequest({
-      method: "GET", url: downloadUrl(range), responseType: "arraybuffer", timeout: 30000
-    });
-  } catch {
-    throw new Error("入出金明細のHTTP応答を受信できません。Tampermonkeyの接続許可を確認してください。");
-  }
-  if (!response.status) throw new Error("入出金明細のHTTP応答を受信できません。");
-  if (response.status !== 200) throw new Error(`入出金明細の取得に失敗しました（HTTP ${response.status}）。`);
-  if (response.finalUrl && response.finalUrl.split("?")[0] !== downloadPath) {
-    throw new Error("入出金明細の取得先から別のページへ転送されました。円貨入出金明細画面を開いてください。");
-  }
-  if (!response.response) throw new Error("入出金明細の応答が空です（HTTP 200）。");
-  let csv: string;
-  try {
-    csv = typeof response.response === "string" ? response.response : decodeCsv(response.response);
-  } catch {
-    throw new Error("入出金明細の文字コードを読み取れません（HTTP 200）。");
-  }
-  const first = csv.trimStart()[0];
-  if (!first) throw new Error("入出金明細の応答が空です（HTTP 200）。");
-  if (first === "<") throw new Error("入出金明細の代わりにHTMLが返りました（HTTP 200）。円貨入出金明細画面を確認してください。");
-  if (first === "{" || first === "[") throw new Error("入出金明細のCSV取得先からJSONが返りました（HTTP 200）。");
-  return readStatement(csv, range);
+  return collectStatementPages(async number => {
+    const url = statementPageUrl(range, number);
+    let response: QueryResponse;
+    try {
+      response = await GM.xmlHttpRequest({ method: "GET", url, responseType: "json", timeout: 30000 });
+    } catch {
+      throw new Error("入出金明細のHTTP応答を受信できません。Tampermonkeyの接続許可を確認してください。");
+    }
+    if (!response.status) throw new Error("入出金明細のHTTP応答を受信できません。");
+    if (response.status !== 200) throw new Error(`入出金明細の取得に失敗しました（HTTP ${response.status}）。`);
+    if (response.finalUrl && response.finalUrl.split("?")[0] !== url.split("?")[0]) {
+      throw new Error("入出金明細の取得先から別のページへ転送されました。円貨入出金明細画面を開いてください。");
+    }
+    return readStatementPage(response.response, range, number);
+  });
 }
 
 export async function fetchBalances(): Promise<unknown> {

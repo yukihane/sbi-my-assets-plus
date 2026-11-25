@@ -69,19 +69,20 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     });
     await page.goto("https://site.sbisec.co.jp/account/assets");
     await page.evaluate(() => {
-      globalThis.GM = { async xmlHttpRequest({ url }) {
-        const expected = "https://member.c.sbisec.co.jp/banking/api/yen/detail/download";
+      globalThis.GM = { async xmlHttpRequest({ method, url, responseType }) {
+        const expected = "https://member.c.sbisec.co.jp/banking/api/yen/detail/query";
         const target = new URL(url);
-        if (target.origin + target.pathname !== expected || target.searchParams.get("pageSize") !== "-1" ||
+        if (method !== "GET" || responseType !== "json" ||
+            target.origin + target.pathname !== expected || target.searchParams.get("pageSize") !== "10" ||
             target.searchParams.get("depositDateFrom") !== "20250101" ||
-            target.searchParams.get("depositDateTo") !== "20250108") throw new Error("Unexpected CSV request");
-        const csv = [
-          "指定期間(開始),指定期間(終了),明細数,指定取引区分",
-          "2025/01/01,2025/01/08,1,入金:すべて、出金:すべて",
-          "入出金日,取引,区分,摘要,出金額,入金額",
-          "2025/01/06,入金,金融機関からの入金,テスト振込,0,200000"
-        ].join("\n");
-        return { status: 200, finalUrl: url, response: new TextEncoder().encode(csv).buffer };
+            target.searchParams.get("depositDateTo") !== "20250108") throw new Error("Unexpected query request");
+        const pageNumber = Number(target.searchParams.get("pageNumber"));
+        const row = { payDepDate: "2025/01/06", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "テスト振込" };
+        return { status: 200, finalUrl: url, response: {
+          totalCount: 11, pageSize: 10, pageNumber, pageCount: 2,
+          detailsConditions: ["入金：すべて", "出金：すべて"], exceededMaxCount: false, isExceededMaxCount: false,
+          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) : [{ ...row, payAmount: "100000" }]
+        } };
       }};
     });
     await page.addScriptTag({ path: fileURLToPath(new URL("../dist/sbi-my-assets-plus.user.js", import.meta.url)) });
@@ -100,9 +101,10 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("[role=alert]")?.textContent.includes("HTTP 403"));
     valuationStatus = 200;
     await page.evaluate(() => {
-      const download = GM.xmlHttpRequest;
+      const query = GM.xmlHttpRequest;
       GM.xmlHttpRequest = async (...args) => {
-        GM.xmlHttpRequest = download;
+        if (new URL(args[0].url).searchParams.get("pageNumber") === "1") return query(...args);
+        GM.xmlHttpRequest = query;
         return { status: 403, response: null };
       };
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit();

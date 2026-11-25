@@ -85,16 +85,16 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     output.replaceChildren(); review.replaceChildren(); review.hidden = true;
     status.textContent = "評価額と円貨入出金明細を取得中…";
     try {
-      const [assets, csv] = await Promise.allSettled([fetchBalances(), fetchStatement(range)]);
+      const [assets, statement] = await Promise.allSettled([fetchBalances(), fetchStatement(range)]);
       coverage = null; entries = [];
       if (assets.status === "rejected") throw assets.reason;
       balances = assets.value;
-      if (csv.status === "fulfilled") {
-        entries = csv.value; coverage = range;
+      if (statement.status === "fulfilled") {
+        entries = statement.value; coverage = range;
         buildReview(); status.textContent = "";
       } else {
-        status.textContent = csv.reason instanceof Error && csv.reason.message
-          ? csv.reason.message : "入出金明細を読み取れませんでした。";
+        status.textContent = statement.reason instanceof Error && statement.reason.message
+          ? statement.reason.message : "入出金明細を読み取れませんでした。";
       }
       render(); scope.disabled = false;
     } catch (error) {
