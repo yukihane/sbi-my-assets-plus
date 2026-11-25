@@ -1,4 +1,6 @@
 import type { Coverage, FlowKind } from "./analytics.ts";
+import { exchangeCandidate, fetchExchanges, markUnverified, reconcileExchanges } from "./exchange.ts";
+import { adjacentBusinessDay } from "./business-day.ts";
 import { createResultsView } from "./panel.ts";
 import { fetchBalances, fetchStatement, type Statement } from "./sbi.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
@@ -30,6 +32,7 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
   let balances: unknown;
   let entries: Statement[] = [];
   let coverage: Coverage | null = null;
+  let exchangeNotice = "";
 
   function render() {
     const selected = balanceSeries[scope.selectedIndex];
@@ -42,7 +45,7 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     }
     output.replaceChildren(results(history, full ? entries : [], full ? coverage : null));
     if (!full) output.prepend("この集計対象では資金移動の分類が未確認のため、評価額のみ表示します。");
-    else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。`);
+    else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。${exchangeNotice}`);
   }
   function buildReview() {
     const groups = new Map<string, Statement[]>();
@@ -91,7 +94,31 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
       balances = assets.value;
       if (statement.status === "fulfilled") {
         entries = statement.value; coverage = range;
-        buildReview(); status.textContent = "";
+        exchangeNotice = "";
+        status.textContent = "";
+        if (entries.some(exchangeCandidate)) {
+          status.textContent = "米ドルの為替注文履歴を照合中…";
+          try {
+            const earliest = new Date(today);
+            earliest.setUTCFullYear(earliest.getUTCFullYear() - 5);
+            const cutoff = earliest.toISOString().slice(0, 10);
+            let firstSettlement = adjacentBusinessDay(cutoff, 1);
+            if (adjacentBusinessDay(firstSettlement, -1) < cutoff) firstSettlement = adjacentBusinessDay(firstSettlement, 1);
+            const old = entries.filter(row => exchangeCandidate(row) && row.date < firstSettlement);
+            markUnverified(old);
+            const start = range.start > firstSettlement ? range.start : firstSettlement;
+            const orders = entries.some(exchangeCandidate) ? await fetchExchanges({ start, end: range.end }) : [];
+            const { matched, unresolved } = reconcileExchanges(entries, orders);
+            exchangeNotice = ` 米ドルの両替${matched}件を外部入出金から除外しました。`;
+            status.textContent = unresolved ? `円貨明細と一対一で照合できない米ドル約定が${unresolved}件あります。` : "";
+            if (old.length) status.append(" 為替注文履歴の照会範囲外の入出金があります。");
+          } catch (error) {
+            markUnverified(entries.filter(exchangeCandidate));
+            status.textContent = (error instanceof Error ? error.message : "為替注文履歴を確認できません。") +
+              " 「その他」の入出金には未照合の両替が含まれる可能性があります。";
+          }
+        }
+        buildReview();
       } else {
         status.textContent = statement.reason instanceof Error && statement.reason.message
           ? statement.reason.message : "入出金明細を読み取れませんでした。";

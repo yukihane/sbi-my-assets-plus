@@ -73,6 +73,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     // Serve a local fixture at the target URL. No request goes to the real site.
     await page.setRequestInterception(true);
     let valuationStatus = 403;
+    let fxOrders = [];
     page.on("request", request => {
       if (request.isNavigationRequest()) {
         void request.respond({ contentType: "text/html", body: "<main></main>" });
@@ -82,12 +83,18 @@ for (const [name, executablePath] of Object.entries(browsers)) {
           [Date.parse("2025-01-08T00:00:00+09:00"), 1230000]
         ];
         void request.respond({ status: valuationStatus, contentType: "text/plain", body: JSON.stringify({ balances }) });
+      } else if (request.url().startsWith("https://site.sbisec.co.jp/exchange/api/order/histories?")) {
+        void request.respond({ contentType: "application/json", body: JSON.stringify({
+          message: null, orderDetails: fxOrders, page: { pageNum: 1, pageSize: 10, totalCount: fxOrders.length,
+            firstPage: true, lastPage: true, hasPreviousPage: false, hasNextPage: false }
+        }) });
       } else {
         void request.abort();
       }
     });
     await page.goto("https://site.sbisec.co.jp/account/assets");
     await page.evaluate(() => {
+      Date.now = () => Date.parse("2026-01-09T12:00:00+09:00");
       globalThis.GM = { async xmlHttpRequest({ method, url, responseType }) {
         const expected = "https://member.c.sbisec.co.jp/banking/api/yen/detail/query";
         const target = new URL(url);
@@ -179,6 +186,15 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       return root.querySelector("dd")?.textContent === "1,130,000 円" &&
         root.querySelector("dl div:nth-child(2) dd")?.textContent === "+130,000 円";
+    });
+    fxOrders = [{ businessDate: "2025-01-07", netAmount: "100000", currencyCode: "USD",
+      buySellCode: "SELL", exchangeTradeType: "REAL", orderNo: "fixture", orderEventId: "fixture-event",
+      exchangeOrderStatus: "COMPLETED", displayOrderStatus: "ORDER_FINISHED" }];
+    await page.evaluate(() => document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit());
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      return root.querySelector("#results").textContent.includes("米ドルの両替1件") &&
+        root.querySelector("dd")?.textContent === "1,130,000 円";
     });
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
   } finally {
