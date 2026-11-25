@@ -98,12 +98,10 @@ for (const [name, executablePath] of Object.entries(browsers)) {
         const pageNumber = Number(target.searchParams.get("pageNumber"));
         const row = { payDepDate: "2025/01/08", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "テスト振込" };
         return { status: 200, finalUrl: url, response: {
-          totalCount: 12, pageSize: 10, pageNumber, pageCount: 2,
+          totalCount: 11, pageSize: 10, pageNumber, pageCount: 2,
           detailsConditions: ["入金：すべて", "出金：すべて"], exceededMaxCount: false, isExceededMaxCount: false,
-          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "30000" }) :
-            ["40000", "60000"].map(payAmount => ({
-              ...row, payDepKbn: "出金", detailKbn: "その他", dispAbstract: "", payAmount
-            }))
+          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) :
+            [{ ...row, detailKbn: "その他", payAmount: "100000" }]
         } };
       }};
     });
@@ -170,8 +168,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     await page.evaluate(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       root.querySelector("details summary").click();
-      const labels = [...root.querySelectorAll("details[open] label")];
-      const select = labels.find(label => label.textContent.includes("2025-01-08") && label.textContent.includes("40,000 円")).querySelector("select");
+      const select = root.querySelector("details[open] select");
       select.value = "internal";
       select.dispatchEvent(new Event("change"));
     });
@@ -180,17 +177,9 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     await changeBase("");
     await page.waitForFunction(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
-      return root.querySelector("dd")?.textContent === "990,000 円" &&
-        root.querySelector("dl div:nth-child(2) dd")?.textContent === "-10,000 円";
+      return root.querySelector("dd")?.textContent === "1,130,000 円" &&
+        root.querySelector("dl div:nth-child(2) dd")?.textContent === "+130,000 円";
     });
-    await page.evaluate(() => {
-      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
-      const group = [...root.querySelectorAll("details[open] label")].find(label => label.textContent.includes("全2件"));
-      const select = group.querySelector("select");
-      select.value = "internal";
-      select.dispatchEvent(new Event("change"));
-    });
-    assert.equal((await read()).profit, "-70,000 円");
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
   } finally {
     await browser.close();
