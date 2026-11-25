@@ -1,6 +1,5 @@
-import { analyze } from "./analytics.ts";
 import { decodeCsv, readFlows } from "./csv.ts";
-import { results } from "./panel.ts";
+import { createResultsView } from "./panel.ts";
 import { mountLive } from "./live.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
 import { coverage, layout, sampleCsv, valuations } from "./preview-data.ts";
@@ -55,6 +54,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
     input("end").value = coverage.end;
   }
   const output = root.querySelector("#results")!;
+  const results = createResultsView();
   const error = root.querySelector("[role=alert]")!;
   let revision = 0;
   async function refresh() {
@@ -73,7 +73,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
         }
         if (current !== revision) return;
         const history = readValuations(data, balanceSeries[scope.selectedIndex].key);
-        output.replaceChildren(results(analyze(history, [], null)));
+        output.replaceChildren(results(history, [], null));
         return;
       }
       if (!preview) return;
@@ -81,7 +81,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
       const range = { start: input("start").value, end: input("end").value };
       const text = file ? decodeCsv(await file.arrayBuffer()) : sampleCsv;
       if (current !== revision) return;
-      output.replaceChildren(results(analyze(valuations, readFlows(text, layout), range)));
+      output.replaceChildren(results(valuations, readFlows(text, layout), range));
     } catch (cause) {
       if (current === revision) error.textContent = cause instanceof Error ? cause.message : "読み込みに失敗しました。";
     }

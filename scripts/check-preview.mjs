@@ -24,6 +24,25 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     });
     const expected = { profit: "+30,800 円", charts: 2, rows: 4, error: "" };
     assert.deepEqual(await read(), expected);
+    const changeBase = date => page.evaluate(value => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      const select = root.querySelector("[name=baseDate]");
+      select.value = value;
+      select.dispatchEvent(new Event("change"));
+      return {
+        base: select.value,
+        firstProfit: root.querySelector("tbody tr td:nth-child(5)").textContent,
+        chartStarts: [...root.querySelectorAll("figure select")].map(input => input.options[0].value),
+        lastAmounts: [...root.querySelectorAll("figure")].map(fig => [...fig.querySelectorAll("figcaption strong")].at(-1).textContent)
+      };
+    }, date);
+    const mid = await changeBase("2026-01-10");
+    assert.equal(mid.firstProfit, "0 円");
+    assert.deepEqual(mid.chartStarts, ["2026-01-10", "2026-01-10"]);
+    assert.deepEqual(mid.lastAmounts, ["1,230,800 円", "800 円"]);
+    assert.deepEqual(await read(), { ...expected, profit: "+800 円", rows: 3 });
+    await changeBase("");
+    assert.deepEqual(await read(), expected);
     const input = await page.evaluateHandle(() =>
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("input[name=csv]"));
     await input.uploadFile(csv);
@@ -77,7 +96,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
             target.searchParams.get("depositDateFrom") !== "20250101" ||
             target.searchParams.get("depositDateTo") !== "20250108") throw new Error("Unexpected query request");
         const pageNumber = Number(target.searchParams.get("pageNumber"));
-        const row = { payDepDate: "2025/01/06", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "テスト振込" };
+        const row = { payDepDate: "2025/01/08", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "テスト振込" };
         return { status: 200, finalUrl: url, response: {
           totalCount: 11, pageSize: 10, pageNumber, pageCount: 2,
           detailsConditions: ["入金：すべて", "出金：すべて"], exceededMaxCount: false, isExceededMaxCount: false,
@@ -143,6 +162,9 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       first: ["1,000,000 円", "1,000,000 円", "0 円", "1,000,000 円"],
       initialDate: "2025-01-08", pointerDate: "2025-01-08", silhouettes: 4
     });
+    const last = await changeBase("2025-01-08");
+    assert.equal(last.firstProfit, "0 円");
+    assert.deepEqual(await read(), { profit: "0 円", charts: 2, rows: 1, error: "" });
     await page.evaluate(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       root.querySelector("details summary").click();
@@ -150,6 +172,9 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       select.value = "internal";
       select.dispatchEvent(new Event("change"));
     });
+    assert.equal(await page.evaluate(() =>
+      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("[name=baseDate]").value), "2025-01-08");
+    await changeBase("");
     await page.waitForFunction(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       return root.querySelector("dd")?.textContent === "1,130,000 円" &&

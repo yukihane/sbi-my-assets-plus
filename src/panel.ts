@@ -1,4 +1,4 @@
-import { analyze } from "./analytics.ts";
+import { analyze, type Coverage, type Flow, type Valuation } from "./analytics.ts";
 import { chart, provisionalSeries, series } from "./chart.ts";
 
 const yen = (n: number | null) => n === null ? "—" : n.toLocaleString("ja-JP") + " 円";
@@ -6,7 +6,44 @@ const statusText = {
   ok: "集計済み", "no-history": "履歴不足", "missing-value": "評価額欠測", unclassified: "未分類"
 };
 
-export function results(result: ReturnType<typeof analyze>) {
+export function createResultsView() {
+  let selectedBase = "";
+  return (history: Valuation[], flows: Flow[], coverage: Coverage | null) => {
+    const full = analyze(history, flows, coverage);
+    if (!coverage || !full.initial) return results(full);
+    const firstDate = full.initial.date;
+    const fromFirst = { ...full, points: full.points.filter(point => point.date >= firstDate) };
+
+    const label = document.createElement("label");
+    const select = document.createElement("select");
+    select.name = "baseDate";
+    select.add(new Option("自動（" + firstDate + "）", ""));
+    for (const point of full.points) {
+      if (point.value !== null && coverage.start <= point.date && point.date <= coverage.end) {
+        select.add(new Option(point.date, point.date));
+      }
+    }
+    select.value = selectedBase;
+    if (select.selectedIndex < 0) select.selectedIndex = 0;
+    selectedBase = select.value;
+    label.append("損益の基準日（この日を0円として表示） ", select);
+    const view = document.createElement("div");
+    const body = document.createElement("div");
+    function redraw() {
+      selectedBase = select.value;
+      const date = selectedBase || firstDate;
+      const analysis = date === firstDate ? fromFirst :
+        analyze(history.filter(row => row.date >= date), flows, coverage);
+      body.replaceChildren(results(analysis));
+    }
+    select.addEventListener("change", redraw);
+    view.append(label, body);
+    redraw();
+    return view;
+  };
+}
+
+function results(result: ReturnType<typeof analyze>) {
   const section = document.createElement("section");
   const latest = result.points.at(-1);
   if (!latest) { section.textContent = "資産評価額がありません。"; return section; }
@@ -15,9 +52,9 @@ export function results(result: ReturnType<typeof analyze>) {
     ? latest.deposits - latest.withdrawals : null;
   const metrics = [
     ["入出金を除いた資産額", latest.status === "unclassified" ? "分類待ち" : yen(latest.adjustedValue)],
-    ["開始時からの運用損益", (latest.profit !== null && latest.profit > 0 ? "+" : "") + yen(latest.profit)],
+    ["基準日からの運用損益", (latest.profit !== null && latest.profit > 0 ? "+" : "") + yen(latest.profit)],
     ["最新評価額（" + latest.date + "）", yen(latest.value)],
-    ["開始評価額（" + (result.initial?.date ?? "未確定") + "）", yen(result.initial?.yen ?? null)],
+    ["基準日の評価額（" + (result.initial?.date ?? "未確定") + "）", yen(result.initial?.yen ?? null)],
     ["累計外部入金", yen(latest.deposits)], ["累計外部出金", yen(latest.withdrawals)],
     ["累計純入金", yen(net)]
   ];

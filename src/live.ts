@@ -1,5 +1,5 @@
-import { analyze, type Coverage, type FlowKind } from "./analytics.ts";
-import { results } from "./panel.ts";
+import type { Coverage, FlowKind } from "./analytics.ts";
+import { createResultsView } from "./panel.ts";
 import { fetchBalances, fetchStatement, type Statement } from "./sbi.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
 
@@ -10,6 +10,7 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
   const button = form.querySelector("button")!;
   const status = root.querySelector("[role=alert]")!;
   const output = root.querySelector("#results")!;
+  const results = createResultsView();
   const review = document.createElement("details");
   output.before(review);
   const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -39,8 +40,7 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
       const { start, end } = coverage;
       history = history.filter(point => start <= point.date && point.date <= end);
     }
-    const analysis = analyze(history, full ? entries : [], full ? coverage : null);
-    output.replaceChildren(results(analysis));
+    output.replaceChildren(results(history, full ? entries : [], full ? coverage : null));
     if (!full) output.prepend("この集計対象では資金移動の分類が未確認のため、評価額のみ表示します。");
     else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。`);
   }
