@@ -163,7 +163,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       const first = amounts();
       const plot = figure.querySelector("canvas[role=img]");
       plot.dispatchEvent(new PointerEvent("pointerdown", { clientX: plot.getBoundingClientRect().right }));
-      // Discard hue and brightness. The four swatches must retain different silhouettes.
+      // Discard hue and brightness to check that the asset swatches have distinct silhouettes.
       const masks = [...figure.querySelectorAll("figcaption canvas")].map(canvas => {
         const { data } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
         return data.filter((_, i) => i % 4 === 3).map(alpha => Number(alpha > 127)).join("");
@@ -171,9 +171,9 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       return { latest, first, initialDate, pointerDate: dates.value, silhouettes: new Set(masks).size };
     });
     assert.deepEqual(inspection, {
-      latest: ["1,230,000 円", "1,200,000 円", "30,000 円", "1,030,000 円"],
-      first: ["1,000,000 円", "1,000,000 円", "0 円", "1,000,000 円"],
-      initialDate: "2025-01-08", pointerDate: "2025-01-08", silhouettes: 4
+      latest: ["1,230,000 円", "1,200,000 円", "1,030,000 円"],
+      first: ["1,000,000 円", "1,000,000 円", "1,000,000 円"],
+      initialDate: "2025-01-08", pointerDate: "2025-01-08", silhouettes: 3
     });
     const last = await changeBase("2025-01-08");
     assert.equal(last.firstProfit, "0 円");

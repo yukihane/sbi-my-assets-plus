@@ -1,5 +1,5 @@
 import { analyze, type Coverage, type Flow, type Valuation } from "./analytics.ts";
-import { chart, provisionalSeries, series } from "./chart.ts";
+import { assetSeries, chart, profitSeries, provisionalSeries } from "./chart.ts";
 
 const yen = (n: number | null) => n === null ? "—" : n.toLocaleString("ja-JP") + " 円";
 const statusText = {
@@ -93,7 +93,7 @@ function results(result: ReturnType<typeof analyze>) {
     }
   }
   details.append(title, table);
-  const lines = showProvisional ? [...series, provisionalSeries] : series;
-  section.append(summary, notice, chart(result.points, lines), chart(result.points, [series[2]]), details);
+  const lines = showProvisional ? [...assetSeries, provisionalSeries] : assetSeries;
+  section.append(summary, notice, chart(result.points, lines), chart(result.points, [profitSeries]), details);
   return section;
 }

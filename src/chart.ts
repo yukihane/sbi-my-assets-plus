@@ -11,10 +11,12 @@ export const provisionalSeries: Series = {
   key: "provisionalAdjustedValue", label: "暫定資産額（分類済みの入出金のみ）",
   color: "#565656", dash: [10, 3, 2, 3], marker: "cross"
 };
-export const series: Series[] = [
+export const profitSeries: Series = {
+  key: "profit", label: "累積運用損益", color: "#007264", dash: [2, 4], marker: "triangle"
+};
+export const assetSeries: Series[] = [
   { key: "value", label: "資産評価額", color: "#006BA6", dash: [5, 4], marker: "circle" },
   { key: "baseline", label: "入出金調整後の基準額", color: "#A54B00", dash: [14, 5], marker: "square" },
-  { key: "profit", label: "累積運用損益", color: "#007264", dash: [2, 4], marker: "triangle" },
   { key: "adjustedValue", label: "入出金を除いた資産額", color: "#171717", dash: [], marker: "diamond" }
 ];
 
