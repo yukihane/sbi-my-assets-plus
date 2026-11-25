@@ -75,12 +75,34 @@ export async function fetchStatement(range: Coverage) {
 }
 
 export async function fetchBalances(): Promise<unknown> {
-  const response = await fetch("/account/api/assets/valuations", {
-    credentials: "same-origin", mode: "same-origin", redirect: "error", cache: "no-store",
-    signal: AbortSignal.timeout(30000)
-  });
-  if (!response.ok || !response.headers.get("Content-Type")?.includes("application/json")) {
-    throw new Error("My資産を開いてログイン状態を確認してください。");
+  let response: Response;
+  try {
+    response = await fetch("https://site.sbisec.co.jp/account/api/assets/valuations", {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin", mode: "same-origin", redirect: "manual", cache: "no-store",
+      signal: AbortSignal.timeout(30000)
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error("資産評価額の応答が30秒以内に返りませんでした。");
+    }
+    throw new Error("資産評価額の通信に失敗しました（HTTP応答なし）。");
   }
-  return response.json();
+  if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    throw new Error("資産評価額の取得先から別画面への転送が返りました。My資産を開き直してください。");
+  }
+  if (!response.ok) {
+    throw new Error(`資産評価額の取得に失敗しました（HTTP ${response.status}）。`);
+  }
+  const body = await response.text().catch(() => {
+    throw new Error("資産評価額の応答を最後まで受信できませんでした。");
+  });
+  if (body.trimStart().startsWith("<")) {
+    throw new Error(`資産評価額の代わりに画面が返りました（HTTP ${response.status}）。`);
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error(`資産評価額の応答をJSONとして読み取れません（HTTP ${response.status}）。`);
+  }
 }

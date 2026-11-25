@@ -87,7 +87,7 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     try {
       const [assets, csv] = await Promise.allSettled([fetchBalances(), fetchStatement(range)]);
       coverage = null; entries = [];
-      if (assets.status === "rejected") throw new Error("資産評価額を取得できません。My資産にログインして再試行してください。");
+      if (assets.status === "rejected") throw assets.reason;
       balances = assets.value;
       if (csv.status === "fulfilled") {
         entries = csv.value; coverage = range;

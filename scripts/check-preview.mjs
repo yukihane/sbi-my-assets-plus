@@ -53,6 +53,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("tbody td:nth-child(2)")?.textContent === "4,000 円");
     // Serve a local fixture at the target URL. No request goes to the real site.
     await page.setRequestInterception(true);
+    let valuationStatus = 403;
     page.on("request", request => {
       if (request.isNavigationRequest()) {
         void request.respond({ contentType: "text/html", body: "<main></main>" });
@@ -61,7 +62,7 @@ for (const [name, executablePath] of Object.entries(browsers)) {
           [Date.parse("2025-01-01T00:00:00+09:00"), 1000000],
           [Date.parse("2025-01-08T00:00:00+09:00"), 1230000]
         ];
-        void request.respond({ contentType: "application/json", body: JSON.stringify({ balances }) });
+        void request.respond({ status: valuationStatus, contentType: "text/plain", body: JSON.stringify({ balances }) });
       } else {
         void request.abort();
       }
@@ -95,6 +96,10 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       start.value = "2025-01-01"; end.value = "2025-01-08";
       root.querySelector("form").requestSubmit();
     });
+    await page.waitForFunction(() =>
+      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("[role=alert]")?.textContent.includes("HTTP 403"));
+    valuationStatus = 200;
+    await page.evaluate(() => document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit());
     await page.waitForFunction(() =>
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("dd")?.textContent === "1,030,000 円");
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
