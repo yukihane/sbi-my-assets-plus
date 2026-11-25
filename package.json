@@ -11,6 +11,7 @@
     "@types/node": "^26.6.6",
     "csv-parse": "^7.0.3",
     "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.18.1",
     "typescript": "^7.0.2"
   }
 }
