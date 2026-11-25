@@ -1,6 +1,7 @@
 import type { Coverage, FlowKind } from "./analytics.ts";
 import { exchangeCandidate, fetchExchanges, markUnverified, reconcileExchanges } from "./exchange.ts";
 import { adjacentBusinessDay } from "./business-day.ts";
+import { reconcileInstallments, type Installment } from "./card-installments.ts";
 import { createResultsView } from "./panel.ts";
 import { fetchBalances, fetchStatement, type Statement } from "./sbi.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
@@ -33,6 +34,8 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
   let entries: Statement[] = [];
   let coverage: Coverage | null = null;
   let exchangeNotice = "";
+  let installments: Installment[] = [];
+  let classificationNotice = "";
 
   function render() {
     const selected = balanceSeries[scope.selectedIndex];
@@ -45,7 +48,28 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     }
     output.replaceChildren(results(history, full ? entries : [], full ? coverage : null));
     if (!full) output.prepend("この集計対象では資金移動の分類が未確認のため、評価額のみ表示します。");
-    else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。${exchangeNotice}`);
+    else if (coverage) {
+      if (installments.length) {
+        const details = document.createElement("details");
+        const title = document.createElement("summary");
+        title.textContent = `照合済みのクレカ積立（${installments.length}組）`;
+        const table = document.createElement("table");
+        const header = table.createTHead().insertRow();
+        for (const heading of ["カード入金・振替出金日", "外部入金の計上日（振替入金日）", "計上額"]) {
+          const th = document.createElement("th");
+          th.textContent = heading; header.append(th);
+        }
+        const body = table.createTBody();
+        for (const group of installments) {
+          const row = body.insertRow();
+          for (const value of [group.cardDate, group.depositDate, group.yen.toLocaleString("ja-JP") + " 円"]) {
+            row.insertCell().textContent = value;
+          }
+        }
+        details.append(title, table); output.prepend(details);
+      }
+      output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。${classificationNotice}${exchangeNotice}`);
+    }
   }
   function buildReview() {
     const groups = new Map<string, Statement[]>();
@@ -94,6 +118,11 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
       balances = assets.value;
       if (statement.status === "fulfilled") {
         entries = statement.value; coverage = range;
+        const { matched, unmatchedTransfers } = reconcileInstallments(entries);
+        installments = matched;
+        const metals = entries.filter(row => row.purpose === "metal-withdrawal").length;
+        classificationNotice = metals ? ` 貴金属口座への振替${metals}件を外部出金に計上しました。` : "";
+        if (unmatchedTransfers) classificationNotice += ` クレカ積立と照合できない投信振替${unmatchedTransfers}件は、明細の入出金方向で集計します。`;
         exchangeNotice = "";
         status.textContent = "";
         if (entries.some(exchangeCandidate)) {

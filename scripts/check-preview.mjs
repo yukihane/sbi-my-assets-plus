@@ -104,11 +104,17 @@ for (const [name, executablePath] of Object.entries(browsers)) {
             target.searchParams.get("depositDateTo") !== "20250108") throw new Error("Unexpected query request");
         const pageNumber = Number(target.searchParams.get("pageNumber"));
         const row = { payDepDate: "2025/01/08", payDepKbn: "入金", detailKbn: "金融機関からの入金", dispAbstract: "テスト振込" };
+        const secondPage = [{ ...row, detailKbn: "その他", payAmount: "100000" }];
+        if (globalThis.includeInstallment) {
+          const receipt = { ...row, detailKbn: "その他", dispAbstract: "投信るいとうお買付預り金振替", payAmount: "1000" };
+          const debit = { ...receipt, payDepDate: "2025/01/02", payDepKbn: "出金" };
+          secondPage.push(receipt, debit, { ...debit, payDepKbn: "入金", dispAbstract: "投信積立クレジットカード入金" },
+            { ...debit, payAmount: "500", detailKbn: "各商品取引口座への振替出金", dispAbstract: "金・銀・プラチナ取引口座へ振替出金" });
+        }
         return { status: 200, finalUrl: url, response: {
-          totalCount: 11, pageSize: 10, pageNumber, pageCount: 2,
+          totalCount: 10 + secondPage.length, pageSize: 10, pageNumber, pageCount: 2,
           detailsConditions: ["入金：すべて", "出金：すべて"], exceededMaxCount: false, isExceededMaxCount: false,
-          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) :
-            [{ ...row, detailKbn: "その他", payAmount: "100000" }]
+          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) : secondPage
         } };
       }};
     });
@@ -195,6 +201,18 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       return root.querySelector("#results").textContent.includes("米ドルの両替1件") &&
         root.querySelector("dd")?.textContent === "1,130,000 円";
+    });
+    await page.evaluate(() => {
+      globalThis.includeInstallment = true;
+      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit();
+    });
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      const summary = root.querySelector("#results details summary");
+      return summary?.textContent === "照合済みのクレカ積立（1組）" &&
+        summary.parentElement.querySelector("tbody tr")?.textContent === "2025-01-022025-01-081,000 円" &&
+        root.querySelector("#results").textContent.includes("貴金属口座への振替1件") &&
+        root.querySelector("dd")?.textContent === "1,129,500 円";
     });
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
   } finally {

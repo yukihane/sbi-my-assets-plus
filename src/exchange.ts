@@ -65,7 +65,7 @@ export async function fetchExchanges(range: Coverage) {
 }
 
 export function exchangeCandidate(row: Statement) {
-  return row.defaulted && row.description.startsWith("その他／");
+  return row.defaulted && !row.purpose && row.description.startsWith("その他／");
 }
 
 export function markUnverified(rows: Statement[]) {

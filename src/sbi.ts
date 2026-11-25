@@ -5,19 +5,28 @@ import type { Coverage, Flow, FlowKind } from "./analytics.ts";
 function classify(category: string, detail: string, incoming: boolean): FlowKind {
   if (category === "金融機関からの入金" && incoming) return "deposit";
   if (category === "金融機関への出金" && !incoming) return "withdrawal";
-  if (incoming && detail === "投信積立クレジットカード入金") return "deposit";
   if (category === "ポイント" && incoming && detail.includes("ポイント")) return "deposit";
   if (category === "利金・配当金" || /^譲渡益税(?:源泉徴収|徴収|還付)/u.test(detail)) return "internal";
   return "unknown";
 }
 
-export type Statement = Flow & { description: string; incoming: boolean; defaulted: boolean };
+type Purpose = "card-credit" | "fund-transfer" | "metal-withdrawal";
+export type Statement = Flow & { description: string; incoming: boolean; defaulted: boolean; purpose?: Purpose };
 
 function statement(date: string, amount: number, category: string, detail: string, incoming: boolean): Statement {
-  const classification = classify(category, detail, incoming);
+  const label = detail.normalize("NFKC").trim();
+  let purpose: Purpose | undefined;
+  let classification = classify(category, label, incoming);
+  if (incoming && label === "投信積立クレジットカード入金") {
+    purpose = "card-credit"; classification = "deposit";
+  } else if (category === "その他" && label === "投信るいとうお買付預り金振替") {
+    purpose = "fund-transfer";
+  } else if (!incoming && category === "各商品取引口座への振替出金" && label === "金・銀・プラチナ取引口座へ振替出金") {
+    purpose = "metal-withdrawal"; classification = "withdrawal";
+  }
   const direction = incoming ? "deposit" : "withdrawal";
   return {
-    date, yen: amount, incoming, description: category + "／" + detail,
+    date, yen: amount, incoming, purpose, description: category + "／" + detail,
     kind: classification === "unknown" ? direction : classification, defaulted: classification === "unknown"
   };
 }
