@@ -7,7 +7,7 @@ function classify(category: string, detail: string, incoming: boolean): FlowKind
   if (category === "金融機関への出金" && !incoming) return "withdrawal";
   if (incoming && detail === "投信積立クレジットカード入金") return "deposit";
   if (category === "ポイント" && incoming && detail.includes("ポイント")) return "deposit";
-  if (category === "利金・配当金" || /^譲渡益税(?:徴収|還付)/u.test(detail)) return "internal";
+  if (category === "利金・配当金" || /^譲渡益税(?:源泉徴収|徴収|還付)/u.test(detail)) return "internal";
   return "unknown";
 }
 

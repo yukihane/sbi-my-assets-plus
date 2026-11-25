@@ -1,6 +1,9 @@
 import type { Point } from "./analytics.ts";
 
-type Series = { key: "value" | "baseline" | "profit" | "adjustedValue"; label: string; color: string };
+type Series = { key: "value" | "baseline" | "profit" | "adjustedValue" | "provisionalAdjustedValue"; label: string; color: string };
+export const provisionalSeries: Series = {
+  key: "provisionalAdjustedValue", label: "暫定資産額（分類済みの入出金のみ）", color: "#7039a3"
+};
 export const series: Series[] = [
   { key: "value", label: "資産評価額", color: "#12518d" },
   { key: "baseline", label: "入出金調整後の基準額", color: "#ab5824" },
@@ -15,6 +18,7 @@ export function chart(points: Point[], lines: Series[]) {
     const label = document.createElement("span");
     label.textContent = line.label;
     label.style.borderColor = line.color;
+    if (line.key === "provisionalAdjustedValue") label.style.borderLeftStyle = "dashed";
     caption.append(label);
   }
   const canvas = document.createElement("canvas");
@@ -62,6 +66,7 @@ export function chart(points: Point[], lines: Series[]) {
   for (const line of lines) {
     g.strokeStyle = g.fillStyle = line.color;
     g.lineWidth = 2;
+    g.setLineDash(line.key === "provisionalAdjustedValue" ? [6, 5] : []);
     g.beginPath();
     let contiguous = false;
     for (const point of points) {

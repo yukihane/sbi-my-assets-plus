@@ -81,7 +81,8 @@ for (const [name, executablePath] of Object.entries(browsers)) {
         return { status: 200, finalUrl: url, response: {
           totalCount: 11, pageSize: 10, pageNumber, pageCount: 2,
           detailsConditions: ["入金：すべて", "出金：すべて"], exceededMaxCount: false, isExceededMaxCount: false,
-          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) : [{ ...row, payAmount: "100000" }]
+          depositRecordList: pageNumber === 1 ? Array(10).fill({ ...row, payAmount: "10000" }) :
+            [{ ...row, detailKbn: "その他", payAmount: "100000" }]
         } };
       }};
     });
@@ -115,8 +116,24 @@ for (const [name, executablePath] of Object.entries(browsers)) {
         && root.querySelector("tbody tr");
     });
     await page.evaluate(() => document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit());
-    await page.waitForFunction(() =>
-      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("dd")?.textContent === "1,030,000 円");
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      return root.querySelector("dd")?.textContent === "分類待ち" &&
+        root.querySelector("dl div:nth-child(2) dd")?.textContent === "1,130,000 円" &&
+        root.querySelector("figcaption")?.textContent.includes("暫定資産額");
+    });
+    await page.evaluate(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      root.querySelector("#results button").click();
+      const select = root.querySelector("details[open] select");
+      select.value = "deposit";
+      select.dispatchEvent(new Event("change"));
+    });
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      return root.querySelector("dd")?.textContent === "1,030,000 円" &&
+        !root.querySelector("figcaption")?.textContent.includes("暫定資産額");
+    });
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
   } finally {
     await browser.close();

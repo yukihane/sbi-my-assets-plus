@@ -39,7 +39,18 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
       const { start, end } = coverage;
       history = history.filter(point => start <= point.date && point.date <= end);
     }
-    output.replaceChildren(results(analyze(history, full ? entries : [], full ? coverage : null)));
+    const analysis = analyze(history, full ? entries : [], full ? coverage : null);
+    output.replaceChildren(results(analysis));
+    if (analysis.points.at(-1)?.status === "unclassified") {
+      const classify = document.createElement("button");
+      classify.textContent = "未分類の明細を選んで再計算";
+      classify.addEventListener("click", () => {
+        review.open = true;
+        review.querySelector<HTMLSelectElement>('select:has(option[value="unknown"]:checked)')?.focus();
+        review.scrollIntoView({ block: "start" });
+      });
+      output.prepend(classify);
+    }
     if (!full) output.prepend("この集計対象では資金移動の分類が未確認のため、評価額のみ表示します。");
     else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。`);
   }
