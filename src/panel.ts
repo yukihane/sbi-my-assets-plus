@@ -14,6 +14,7 @@ export function results(result: ReturnType<typeof analyze>) {
   const net = latest.deposits !== null && latest.withdrawals !== null
     ? latest.deposits - latest.withdrawals : null;
   const metrics = [
+    ["入出金を除いた資産額", yen(latest.adjustedValue)],
     ["最新評価額（" + latest.date + "）", yen(latest.value)],
     ["開始評価額（" + (result.initial?.date ?? "未確定") + "）", yen(result.initial?.yen ?? null)],
     ["累計外部入金", yen(latest.deposits)], ["累計外部出金", yen(latest.withdrawals)],
@@ -36,13 +37,13 @@ export function results(result: ReturnType<typeof analyze>) {
   title.textContent = "日別明細";
   const table = document.createElement("table");
   const header = table.createTHead().insertRow();
-  for (const name of ["評価日", "資産評価額", "基準額", "運用損益", "状態"]) {
+  for (const name of ["評価日", "資産評価額", "入出金を除いた資産額", "基準額", "運用損益", "状態"]) {
     const cell = document.createElement("th"); cell.textContent = name; header.append(cell);
   }
   const body = table.createTBody();
   for (const point of result.points) {
     const row = body.insertRow();
-    for (const value of [point.date, yen(point.value), yen(point.baseline), yen(point.profit), statusText[point.status]]) {
+    for (const value of [point.date, yen(point.value), yen(point.adjustedValue), yen(point.baseline), yen(point.profit), statusText[point.status]]) {
       row.insertCell().textContent = value;
     }
   }

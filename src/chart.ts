@@ -1,10 +1,11 @@
 import type { Point } from "./analytics.ts";
 
-type Series = { key: "value" | "baseline" | "profit"; label: string; color: string };
+type Series = { key: "value" | "baseline" | "profit" | "adjustedValue"; label: string; color: string };
 export const series: Series[] = [
   { key: "value", label: "資産評価額", color: "#12518d" },
   { key: "baseline", label: "入出金調整後の基準額", color: "#ab5824" },
-  { key: "profit", label: "累積運用損益", color: "#00765c" }
+  { key: "profit", label: "累積運用損益", color: "#00765c" },
+  { key: "adjustedValue", label: "入出金を除いた資産額", color: "#7039a3" }
 ];
 
 export function chart(points: Point[], lines: Series[]) {

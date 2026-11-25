@@ -8,6 +8,7 @@ export type Point = {
   date: string;
   value: number | null;
   baseline: number | null;
+  adjustedValue: number | null;
   profit: number | null;
   deposits: number | null;
   withdrawals: number | null;
@@ -77,6 +78,7 @@ export function analyze(valuations: readonly Valuation[], flows: readonly Flow[]
     const profit = baseline !== null && row.yen !== null ? row.yen - baseline : null;
     points.push({
       date: row.date, value: row.yen, baseline, profit,
+      adjustedValue: profit !== null && initial ? initial.yen + profit : null,
       deposits: baseline !== null ? deposits : null,
       withdrawals: baseline !== null ? withdrawals : null,
       unknownCount: unknownDates.length,

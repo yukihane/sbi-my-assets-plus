@@ -9,6 +9,7 @@ const flows = readFlows(sampleCsv, layout);
 test("開始日の反映済み入金、外部入出金、配当と税を区別する", () => {
   const result = analyze(valuations.toReversed(), flows.toReversed(), coverage);
   assert.deepEqual(result.points.map(p => p.profit), [0, 30000, 30000, 30800]);
+  assert.deepEqual(result.points.map(p => p.adjustedValue), [1000000, 1030000, 1030000, 1030800]);
   const latest = result.points.at(-1);
   assert.equal(latest.deposits, 200000);
   assert.equal(latest.withdrawals, 50000);
@@ -35,6 +36,7 @@ test("履歴外、評価額欠測、未分類による保留を扱う", () => {
   assert.deepEqual(result.points.map(p => p.status),
     ["no-history", "ok", "ok", "missing-value", "unclassified", "unclassified", "no-history"]);
   assert.deepEqual(result.points.map(p => p.profit), [null, 0, 30000, null, null, null, null]);
+  assert.deepEqual(result.points.map(p => p.adjustedValue), [null, 1000000, 1030000, null, null, null, null]);
   assert.deepEqual(result.unknownDates, ["2026-01-16"]);
 });
 
