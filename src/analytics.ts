@@ -31,17 +31,19 @@ function checkYen(value: number) {
   if (!Number.isSafeInteger(value)) throw new Error("円換算額を確認してください。");
 }
 
-export function analyze(valuations: readonly Valuation[], flows: readonly Flow[], coverage: Coverage) {
-  checkDate(coverage.start);
-  checkDate(coverage.end);
-  if (coverage.start > coverage.end) throw new Error("照会期間の開始日と終了日を確認してください。");
+export function analyze(valuations: readonly Valuation[], flows: readonly Flow[], coverage: Coverage | null) {
+  if (coverage) {
+    checkDate(coverage.start);
+    checkDate(coverage.end);
+    if (coverage.start > coverage.end) throw new Error("照会期間の開始日と終了日を確認してください。");
+  }
 
   const history = [...valuations].sort((a, b) => a.date.localeCompare(b.date));
   const entries = [...flows].sort((a, b) => a.date.localeCompare(b.date));
   for (const row of entries) {
     checkDate(row.date);
     checkYen(row.yen);
-    if (row.yen < 0 || row.date < coverage.start || row.date > coverage.end) {
+    if (!coverage || row.yen < 0 || row.date < coverage.start || row.date > coverage.end) {
       throw new Error("照会期間または明細金額を確認してください。");
     }
   }
@@ -56,7 +58,7 @@ export function analyze(valuations: readonly Valuation[], flows: readonly Flow[]
     checkDate(row.date);
     if (row.yen !== null) checkYen(row.yen);
     if (points.at(-1)?.date === row.date) throw new Error("同じ評価日のデータが複数あります。");
-    const covered = row.date >= coverage.start && row.date <= coverage.end;
+    const covered = coverage && row.date >= coverage.start && row.date <= coverage.end;
     if (!initial && covered && row.yen !== null) initial = { date: row.date, yen: row.yen };
 
     while (cursor < entries.length && entries[cursor].date <= row.date) {
