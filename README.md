@@ -26,4 +26,4 @@ pnpm build
 
 Windows 11でビルド後に `node scripts/check-preview.mjs` を実行すると、インストール済みのChromeとFirefoxを一時プロファイルで開き、グラフ表示とCSV再取込を検証します。標準以外の場所にある場合は `CHROME_PATH` と `FIREFOX_PATH` に実行ファイルのパスを指定してください。
 
-ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。開発版をTampermonkeyに入れ、My資産の `https://site.sbisec.co.jp/account/assets` を再読み込みすると、ページ下部の「運用成績（UserScript）」で期間を指定して「更新」できます。Tampermonkeyは円貨入出金明細の取得に `member.c.sbisec.co.jp` への接続を使います。「外部入出金として扱う明細の分類を変更」では、同じ方向・区分・摘要をまとめて「純入金額に含めない」に変更できます。変更は次の更新まで有効です。現時点の入出金調整は預り金・iDeCoを含む基本系列で計算し、除外系列では評価額を表示します。GitHub Releasesからの配布要件は[実装計画](./doc/implementation-plan.md)に記載しています。
+ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。データの取得範囲、入出金の分類、損益の計算式は[取得と集計の仕様](./doc/design.md)に記載しています。
