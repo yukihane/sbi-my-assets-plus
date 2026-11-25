@@ -1,4 +1,4 @@
-import type { Coverage, FlowKind } from "./analytics.ts";
+import type { Coverage } from "./analytics.ts";
 import { createResultsView } from "./panel.ts";
 import { fetchBalances, fetchStatement, type Statement } from "./sbi.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
@@ -54,18 +54,46 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     }
     if (!groups.size) return;
     const title = document.createElement("summary");
-    title.textContent = "外部入出金として扱う明細の分類を変更（同じ区分・摘要に一括適用）";
+    title.textContent = "外部入出金として扱う明細の分類を変更";
     review.append(title);
     for (const [key, group] of groups) {
-      const label = document.createElement("label");
-      const select = document.createElement("select");
-      select.add(new Option(group[0].incoming ? "外部入金" : "外部出金", group[0].incoming ? "deposit" : "withdrawal"));
-      select.add(new Option("純入金額に含めない", "internal"));
-      select.addEventListener("change", () => {
-        for (const row of group) row.kind = select.value as FlowKind;
-        render();
+      const fieldset = document.createElement("fieldset");
+      const legend = document.createElement("legend");
+      legend.textContent = key;
+      fieldset.append(legend);
+      const external = group[0].incoming ? "deposit" : "withdrawal";
+      const externalLabel = group[0].incoming ? "外部入金" : "外部出金";
+      const selects = group.map(row => {
+        const label = document.createElement("label");
+        const select = document.createElement("select");
+        select.add(new Option(externalLabel, external));
+        select.add(new Option("純入金額に含めない", "internal"));
+        select.addEventListener("change", () => {
+          row.kind = select.value === "internal" ? "internal" : external;
+          render();
+        });
+        label.append(row.date + "　" + row.yen.toLocaleString("ja-JP") + " 円 ", select);
+        fieldset.append(label);
+        return select;
       });
-      label.append(key + " ", select); review.append(label);
+      if (group.length > 1) {
+        const label = document.createElement("label");
+        const bulk = document.createElement("select");
+        bulk.add(new Option("選択…", ""));
+        bulk.add(new Option(externalLabel, external));
+        bulk.add(new Option("純入金額に含めない", "internal"));
+        bulk.addEventListener("change", () => {
+          if (!bulk.value) return;
+          const kind = bulk.value === "internal" ? "internal" : external;
+          for (const row of group) row.kind = kind;
+          for (const select of selects) select.value = kind;
+          bulk.value = "";
+          render();
+        });
+        label.append("この区分・摘要の全" + group.length + "件をまとめて変更 ", bulk);
+        fieldset.append(label);
+      }
+      review.append(fieldset);
     }
   }
   scope.addEventListener("change", () => {
