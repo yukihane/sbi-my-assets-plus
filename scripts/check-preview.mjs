@@ -99,6 +99,19 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     await page.waitForFunction(() =>
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("[role=alert]")?.textContent.includes("HTTP 403"));
     valuationStatus = 200;
+    await page.evaluate(() => {
+      const download = GM.xmlHttpRequest;
+      GM.xmlHttpRequest = async (...args) => {
+        GM.xmlHttpRequest = download;
+        return { status: 403, response: null };
+      };
+      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit();
+    });
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
+      return root.querySelector("[role=alert]")?.textContent.includes("入出金明細の取得に失敗しました（HTTP 403）")
+        && root.querySelector("tbody tr");
+    });
     await page.evaluate(() => document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit());
     await page.waitForFunction(() =>
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("dd")?.textContent === "1,030,000 円");

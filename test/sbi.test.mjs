@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { downloadUrl, fetchBalances, readStatement } from "../src/sbi.ts";
+import { downloadUrl, fetchBalances, fetchStatement, readStatement } from "../src/sbi.ts";
 
 const range = { start: "2040-01-01", end: "2040-01-31" };
 const csv = [
@@ -21,6 +21,28 @@ test("SBIの一括照会期間・件数・入出金方向を照合する", () =>
     csv.replace("2040/01/31", "2040/01/30"), csv.replace(",120,0", ",120,120"), "<html>Login</html>"]) {
     assert.throws(() => readStatement(bad, range));
   }
+});
+
+test("明細の取得と検証の失敗を区別し、応答本文や転送先をエラーに含めない", async t => {
+  let response = { status: 200, response: new TextEncoder().encode(csv).buffer };
+  globalThis.GM = { xmlHttpRequest: async () => response };
+  t.after(() => { delete globalThis.GM; });
+  assert.equal((await fetchStatement(range)).length, 2);
+  for (const [changes, expected] of [
+    [{ status: 403 }, /HTTP 403/],
+    [{ status: 0 }, /HTTP応答/],
+    [{ finalUrl: "https://example.invalid/private-fixture" }, /転送/],
+    [{ response: "<html>private-fixture</html>" }, /HTML/],
+    [{ response: '{"reason":"private-fixture"}' }, /JSON/],
+    [{ response: new ArrayBuffer(0) }, /応答が空/],
+    [{ response: "private-fixture" }, /照会条件の見出し/],
+    [{ response: csv.replace("200000", "private-fixture") }, /金額欄/]
+  ]) {
+    response = { status: 200, response: csv, ...changes };
+    await assert.rejects(fetchStatement(range), e => expected.test(e.message) && !e.message.includes("private-fixture"));
+  }
+  globalThis.GM.xmlHttpRequest = async () => { throw new Error("private-fixture"); };
+  await assert.rejects(fetchStatement(range), /HTTP応答を受信できません/);
 });
 
 test("資産評価額のJSON本文を読み、ログイン・通信・形式の失敗を区別する", async t => {

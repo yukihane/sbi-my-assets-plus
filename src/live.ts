@@ -93,7 +93,8 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
         entries = csv.value; coverage = range;
         buildReview(); status.textContent = "";
       } else {
-        status.textContent = "円貨入出金明細を取得・検証できません。明細画面のログイン状態と照会期間を確認してください。";
+        status.textContent = csv.reason instanceof Error && csv.reason.message
+          ? csv.reason.message : "入出金明細を読み取れませんでした。";
       }
       render(); scope.disabled = false;
     } catch (error) {
