@@ -1,6 +1,6 @@
 # SBI My Assets Plus
 
-SBI証券のMy資産に、外部入出金を差し引いた運用損益を表示するためのUserScript。現在は架空の週次評価額とテスト用CSVで、集計とグラフを試せる開発版です。実口座向けの初回リリースは、資産推移の応答形式と円貨入出金明細の仕様を確認してから行います。
+SBI証券のMy資産に、外部入出金を差し引いた運用損益を表示するためのUserScript。My資産の「更新」で資産評価額と指定期間の円貨入出金明細をSBI証券から読み取り、「入出金を除いた資産額」をグラフに表示します。
 
 ## ローカルで試す
 
@@ -16,4 +16,4 @@ pnpm build
 
 Windows 11でビルド後に `node scripts/check-preview.mjs` を実行すると、インストール済みのChromeとFirefoxを一時プロファイルで開き、グラフ表示とCSV再取込を検証します。標準以外の場所にある場合は `CHROME_PATH` と `FIREFOX_PATH` に実行ファイルのパスを指定してください。
 
-ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。開発版をTampermonkeyに入れ、My資産の `https://site.sbisec.co.jp/account/assets` を再読み込みすると、ページ下部の「運用成績（UserScript）」で保存済みの評価額JSONを選べます。ローカルプレビューでも同じJSONを選択できます。「集計対象」を公式グラフの表示設定に合わせ、「日別明細」の同じ評価日の金額を照合してください。たとえば両方を非表示にしている場合は「預り金・iDeCoを除外」を選びます。実際の評価額に対する入出金調整は明細の分類が確定するまで保留します。GitHub Releasesからの配布要件は[実装計画](./doc/implementation-plan.md)に記載しています。
+ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。開発版をTampermonkeyに入れ、My資産の `https://site.sbisec.co.jp/account/assets` を再読み込みすると、ページ下部の「運用成績（UserScript）」で期間を指定して「更新」できます。Tampermonkeyは円貨入出金明細の取得に `member.c.sbisec.co.jp` への接続を使います。未分類の明細がある場合は「未分類の明細を確認」で対象内の取引か外部入出金かを指定すると再計算します。分類は更新するまで有効です。現時点の入出金調整は預り金・iDeCoを含む基本系列で計算し、除外系列では評価額を表示します。GitHub Releasesからの配布要件は[実装計画](./doc/implementation-plan.md)に記載しています。

@@ -19,7 +19,7 @@ export interface CsvLayout {
   classify: (description: string, direction: "deposit" | "withdrawal") => FlowKind;
 }
 
-function yen(cell: string): number | null {
+export function yen(cell: string): number | null {
   if (!cell) return null;
   if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(cell)) throw new Error();
   const value = Number(cell.replaceAll(",", ""));
@@ -27,13 +27,16 @@ function yen(cell: string): number | null {
   return value;
 }
 
-export function readFlows(csv: string, layout: CsvLayout): Flow[] {
-  let rows: string[][];
+export function csvRows(csv: string): string[][] {
   try {
-    rows = parse(csv, { bom: true, skip_empty_lines: true, relax_column_count: true, trim: true });
+    return parse(csv, { bom: true, skip_empty_lines: true, relax_column_count: true, trim: true });
   } catch {
     throw new Error("CSVの引用符または区切り文字を確認してください。");
   }
+}
+
+export function readFlows(csv: string, layout: CsvLayout): Flow[] {
+  const rows = csvRows(csv);
   const required = [layout.date, layout.description, layout.deposit, layout.withdrawal];
   const index = rows.findIndex(row => required.every(label => row.includes(label)));
   if (index < 0) throw new Error("CSVに必要な見出しがありません。");

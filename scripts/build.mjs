@@ -8,11 +8,12 @@ const metadata = [
   "// @name         SBI My Assets Plus（開発プレビュー）",
   "// @namespace    sbi-my-assets-plus",
   "// @version      " + version,
-  "// @description  My資産の保存済み評価額を照合する",
+  "// @description  My資産の評価額と入出金明細を取得し、入出金を除いた資産額を表示する",
   "// @match        https://site.sbisec.co.jp/account/assets",
   "// @noframes",
   "// @match        http://127.0.0.1/sbi-my-assets-plus-preview.html",
-  "// @grant        none",
+  "// @grant        GM.xmlHttpRequest",
+  "// @connect      member.c.sbisec.co.jp",
   "// @run-at       document-idle",
   "// ==/UserScript=="
 ].join("\n");

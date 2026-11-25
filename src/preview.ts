@@ -1,6 +1,7 @@
 import { analyze } from "./analytics.ts";
 import { decodeCsv, readFlows } from "./csv.ts";
 import { results } from "./panel.ts";
+import { mountLive } from "./live.ts";
 import { balanceSeries, readValuations } from "./valuations.ts";
 import { coverage, layout, sampleCsv, valuations } from "./preview-data.ts";
 
@@ -22,7 +23,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
       [role=alert] {color:#953020} p:empty {display:none}
     </style>
     <h2>運用成績（UserScript）</h2>
-    <p>${preview ? "架空データでのプレビュー。照会期間に対応するサンプル明細を使用します。" : "保存した資産推移のJSONを選ぶと、日別明細で評価額を照合できます。"}</p>
+    <p>${preview ? "架空データでのプレビュー。照会期間に対応するサンプル明細を使用します。" : "更新するとMy資産の評価額と円貨入出金明細を取得します。"}</p>
     <form>
       <fieldset><legend>評価額の照合</legend>
         <label>My資産の評価額JSON <input name="json" type="file" accept=".json,application/json"></label>
@@ -40,12 +41,12 @@ function mountPanel(container: HTMLElement, preview: boolean) {
   const form = root.querySelector("form")!;
   const scope = form.querySelector("select")!;
   for (const { key, label } of balanceSeries) scope.add(new Option(label, key));
-  scope.addEventListener("change", () => void refresh());
   if (!preview) {
-    root.querySelector("#sample")!.remove();
-    root.querySelector("small")!.remove();
-    form.querySelector("button")!.remove();
+    mountLive(root, form, scope);
+    container.append(host);
+    return;
   }
+  scope.addEventListener("change", () => void refresh());
   const input = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
   if (preview) {
     input("start").value = coverage.start;
