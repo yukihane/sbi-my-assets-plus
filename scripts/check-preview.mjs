@@ -16,13 +16,13 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     const read = () => page.evaluate(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
       return {
-        profit: [...root.querySelectorAll("dd")].at(-1)?.textContent,
-        charts: root.querySelectorAll("canvas").length,
+        profit: root.querySelector("dl div:nth-child(2) dd")?.textContent,
+        charts: root.querySelectorAll("canvas[role=img]").length,
         rows: root.querySelectorAll("tbody tr").length,
         error: root.querySelector("[role=alert]").textContent
       };
     });
-    const expected = { profit: "30,800 円", charts: 2, rows: 4, error: "" };
+    const expected = { profit: "+30,800 円", charts: 2, rows: 4, error: "" };
     assert.deepEqual(await read(), expected);
     const input = await page.evaluateHandle(() =>
       document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("input[name=csv]"));
@@ -118,21 +118,42 @@ for (const [name, executablePath] of Object.entries(browsers)) {
     await page.evaluate(() => document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("form").requestSubmit());
     await page.waitForFunction(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
-      return root.querySelector("dd")?.textContent === "分類待ち" &&
-        root.querySelector("dl div:nth-child(2) dd")?.textContent === "1,130,000 円" &&
-        root.querySelector("figcaption")?.textContent.includes("暫定資産額");
+      return root.querySelector("dd")?.textContent === "1,030,000 円" &&
+        root.querySelector("dl div:nth-child(2) dd")?.textContent === "+30,000 円";
+    });
+    const inspection = await page.evaluate(() => {
+      const figure = document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("figure");
+      const amounts = () => [...figure.querySelectorAll("figcaption strong")].map(node => node.textContent);
+      const dates = figure.querySelector("select");
+      const latest = amounts(), initialDate = dates.value;
+      dates.selectedIndex = 0;
+      dates.dispatchEvent(new Event("change"));
+      const first = amounts();
+      const plot = figure.querySelector("canvas[role=img]");
+      plot.dispatchEvent(new PointerEvent("pointerdown", { clientX: plot.getBoundingClientRect().right }));
+      // Discard hue and brightness. The four swatches must retain different silhouettes.
+      const masks = [...figure.querySelectorAll("figcaption canvas")].map(canvas => {
+        const { data } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+        return data.filter((_, i) => i % 4 === 3).map(alpha => Number(alpha > 127)).join("");
+      });
+      return { latest, first, initialDate, pointerDate: dates.value, silhouettes: new Set(masks).size };
+    });
+    assert.deepEqual(inspection, {
+      latest: ["1,230,000 円", "1,200,000 円", "30,000 円", "1,030,000 円"],
+      first: ["1,000,000 円", "1,000,000 円", "0 円", "1,000,000 円"],
+      initialDate: "2025-01-08", pointerDate: "2025-01-08", silhouettes: 4
     });
     await page.evaluate(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
-      root.querySelector("#results button").click();
+      root.querySelector("details summary").click();
       const select = root.querySelector("details[open] select");
-      select.value = "deposit";
+      select.value = "internal";
       select.dispatchEvent(new Event("change"));
     });
     await page.waitForFunction(() => {
       const root = document.querySelector("#sbi-my-assets-plus").shadowRoot;
-      return root.querySelector("dd")?.textContent === "1,030,000 円" &&
-        !root.querySelector("figcaption")?.textContent.includes("暫定資産額");
+      return root.querySelector("dd")?.textContent === "1,130,000 円" &&
+        root.querySelector("dl div:nth-child(2) dd")?.textContent === "+130,000 円";
     });
     console.log(await browser.version(), "プレビュー・模擬サービスからの取得と集計 OK");
   } finally {

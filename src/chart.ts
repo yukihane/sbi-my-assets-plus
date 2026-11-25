@@ -1,28 +1,73 @@
 import type { Point } from "./analytics.ts";
 
-type Series = { key: "value" | "baseline" | "profit" | "adjustedValue" | "provisionalAdjustedValue"; label: string; color: string };
+type Series = {
+  key: "value" | "baseline" | "profit" | "adjustedValue" | "provisionalAdjustedValue";
+  label: string;
+  color: string;
+  dash: number[];
+  marker: "circle" | "square" | "triangle" | "diamond" | "cross";
+};
 export const provisionalSeries: Series = {
-  key: "provisionalAdjustedValue", label: "暫定資産額（分類済みの入出金のみ）", color: "#7039a3"
+  key: "provisionalAdjustedValue", label: "暫定資産額（分類済みの入出金のみ）",
+  color: "#565656", dash: [10, 3, 2, 3], marker: "cross"
 };
 export const series: Series[] = [
-  { key: "value", label: "資産評価額", color: "#12518d" },
-  { key: "baseline", label: "入出金調整後の基準額", color: "#ab5824" },
-  { key: "profit", label: "累積運用損益", color: "#00765c" },
-  { key: "adjustedValue", label: "入出金を除いた資産額", color: "#7039a3" }
+  { key: "value", label: "資産評価額", color: "#006BA6", dash: [5, 4], marker: "circle" },
+  { key: "baseline", label: "入出金調整後の基準額", color: "#A54B00", dash: [14, 5], marker: "square" },
+  { key: "profit", label: "累積運用損益", color: "#007264", dash: [2, 4], marker: "triangle" },
+  { key: "adjustedValue", label: "入出金を除いた資産額", color: "#171717", dash: [], marker: "diamond" }
 ];
+
+function lineStyle(g: CanvasRenderingContext2D, line: Series) {
+  g.strokeStyle = line.color;
+  g.lineWidth = line.marker === "diamond" ? 3 : 2;
+  g.setLineDash(line.dash);
+}
+
+function drawMarker(g: CanvasRenderingContext2D, line: Series, x: number, y: number) {
+  const r = 4;
+  g.setLineDash([]);
+  g.lineWidth = 2;
+  g.beginPath();
+  switch (line.marker) {
+    case "circle": g.arc(x, y, r, 0, 2 * Math.PI); break;
+    case "square": g.rect(x - r, y - r, 2 * r, 2 * r); break;
+    case "triangle":
+      g.moveTo(x, y - r - 1); g.lineTo(x + r + 1, y + r); g.lineTo(x - r - 1, y + r); g.closePath(); break;
+    case "diamond":
+      g.moveTo(x, y - r - 1); g.lineTo(x + r + 1, y); g.lineTo(x, y + r + 1); g.lineTo(x - r - 1, y); g.closePath(); break;
+    case "cross":
+      g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x - r, y + r); g.lineTo(x + r, y - r); break;
+  }
+  if (line.marker !== "cross") {
+    g.fillStyle = line.marker === "diamond" ? line.color : "#fff";
+    g.fill();
+  }
+  g.stroke();
+}
 
 export function chart(points: Point[], lines: Series[]) {
   const figure = document.createElement("figure");
   const caption = document.createElement("figcaption");
-  for (const line of lines) {
-    const label = document.createElement("span");
-    label.textContent = line.label;
-    label.style.borderColor = line.color;
-    if (line.key === "provisionalAdjustedValue") label.style.borderLeftStyle = "dashed";
-    caption.append(label);
-  }
+  const amounts = lines.map(line => {
+    const item = document.createElement("span");
+    const sample = document.createElement("canvas");
+    sample.width = 112; sample.height = 36;
+    sample.setAttribute("aria-hidden", "true");
+    const context = sample.getContext("2d");
+    if (context) {
+      context.scale(2, 2);
+      lineStyle(context, line);
+      context.beginPath(); context.moveTo(1, 9); context.lineTo(55, 9); context.stroke();
+      drawMarker(context, line, 28, 9);
+    }
+    const amount = document.createElement("strong");
+    item.append(sample, line.label + " ", amount);
+    caption.append(item);
+    return amount;
+  });
   const canvas = document.createElement("canvas");
-  canvas.setAttribute("aria-label", lines.map(line => line.label).join("、") + "の時系列。数値は下の日別明細を参照。");
+  canvas.setAttribute("aria-label", lines.map(line => line.label).join("、") + "の時系列。金額は日別明細でも確認できます。");
   canvas.setAttribute("role", "img");
   figure.append(caption, canvas);
   const width = 760, height = 210;
@@ -48,6 +93,39 @@ export function chart(points: Point[], lines: Series[]) {
   const first = Date.parse(points[0].date), last = Date.parse(points[points.length - 1].date);
   const x = (date: string) => first === last ? (left + right) / 2 :
     left + (Date.parse(date) - first) / (last - first) * (right - left);
+  const positions = points.map(point => x(point.date));
+  const plot = document.createElement("div");
+  plot.style.position = "relative";
+  canvas.style.display = "block";
+  const marker = document.createElement("div");
+  marker.style.cssText = "position:absolute;width:1px;background:#53636c;opacity:.55;pointer-events:none";
+  marker.style.top = (top / height * 100) + "%";
+  marker.style.bottom = ((height - bottom) / height * 100) + "%";
+  plot.append(canvas, marker);
+  const dateLabel = document.createElement("label");
+  const dates = document.createElement("select");
+  for (const point of points) dates.add(new Option(point.date, point.date));
+  dateLabel.append("評価日 ", dates);
+  figure.append(plot, dateLabel);
+  function selectPoint(index: number) {
+    dates.selectedIndex = index;
+    marker.style.left = (positions[index] / width * 100) + "%";
+    for (const [i, line] of lines.entries()) {
+      const amount = points[index][line.key];
+      amounts[i].textContent = amount === null ? "—" : amount.toLocaleString("ja-JP") + " 円";
+    }
+  }
+  selectPoint(points.length - 1);
+  dates.addEventListener("change", () => selectPoint(dates.selectedIndex));
+  function inspect(event: PointerEvent) {
+    const rect = canvas.getBoundingClientRect();
+    const target = (event.clientX - rect.left) / rect.width * width;
+    const nearest = positions.reduce((best, value, index) =>
+      Math.abs(value - target) < Math.abs(positions[best] - target) ? index : best, 0);
+    if (nearest !== dates.selectedIndex) selectPoint(nearest);
+  }
+  canvas.addEventListener("pointermove", inspect);
+  canvas.addEventListener("pointerdown", inspect);
   const y = (yen: number) => bottom - (yen - min) / (max - min) * (bottom - top);
   g.font = "13px sans-serif";
   g.fillStyle = "#374151";
@@ -64,9 +142,7 @@ export function chart(points: Point[], lines: Series[]) {
     g.fillText(points[points.length - 1].date, right, height - 6);
   }
   for (const line of lines) {
-    g.strokeStyle = g.fillStyle = line.color;
-    g.lineWidth = 2;
-    g.setLineDash(line.key === "provisionalAdjustedValue" ? [6, 5] : []);
+    lineStyle(g, line);
     g.beginPath();
     let contiguous = false;
     for (const point of points) {
@@ -77,10 +153,16 @@ export function chart(points: Point[], lines: Series[]) {
       contiguous = true;
     }
     g.stroke();
-    for (const point of points) {
+    let lastMarker = -Infinity;
+    for (const [i, point] of points.entries()) {
       const value = point[line.key];
       if (value === null) continue;
-      g.beginPath(); g.arc(x(point.date), y(value), 3, 0, 2 * Math.PI); g.fill();
+      const endOfSegment = i === points.length - 1 || points[i + 1][line.key] === null;
+      const startOfSegment = i === 0 || points[i - 1][line.key] === null;
+      if (startOfSegment || endOfSegment || positions[i] - lastMarker >= 44) {
+        drawMarker(g, line, positions[i], y(value));
+        lastMarker = positions[i];
+      }
     }
   }
   return figure;

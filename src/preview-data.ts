@@ -13,10 +13,8 @@ export const layout: CsvLayout = {
   date: "反映日", description: "摘要", deposit: "入金額", withdrawal: "出金額",
   effectiveDate: text => text,
   classify(description, direction) {
-    if (description === "外部入金" && direction === "deposit") return "deposit";
-    if (description === "外部出金" && direction === "withdrawal") return "withdrawal";
     if (["配当", "税", "口座内振替"].includes(description)) return "internal";
-    return "unknown";
+    return direction;
   }
 };
 

@@ -15,10 +15,11 @@ export function results(result: ReturnType<typeof analyze>) {
     ? latest.deposits - latest.withdrawals : null;
   const metrics = [
     ["入出金を除いた資産額", latest.status === "unclassified" ? "分類待ち" : yen(latest.adjustedValue)],
+    ["開始時からの運用損益", (latest.profit !== null && latest.profit > 0 ? "+" : "") + yen(latest.profit)],
     ["最新評価額（" + latest.date + "）", yen(latest.value)],
     ["開始評価額（" + (result.initial?.date ?? "未確定") + "）", yen(result.initial?.yen ?? null)],
     ["累計外部入金", yen(latest.deposits)], ["累計外部出金", yen(latest.withdrawals)],
-    ["累計純入金", yen(net)], ["累積運用損益", yen(latest.profit)]
+    ["累計純入金", yen(net)]
   ];
   if (latest.provisionalAdjustedValue !== null) {
     metrics.splice(1, 0, [provisionalSeries.label, yen(latest.provisionalAdjustedValue)]);
@@ -34,7 +35,7 @@ export function results(result: ReturnType<typeof analyze>) {
   notice.textContent = warnings.length ? warnings.join("・") + "。詳細は日別明細を参照してください。" : "";
   if (result.unknownDates.length) {
     notice.append(" " + result.unknownDates[0] + " 以降に未分類の明細が" + result.unknownDates.length +
-      "件あります。紫の破線は、判明している外部入金を引き、外部出金を足し戻した暫定額です。");
+      "件あります。「暫定資産額」は、判明している外部入金を引き、外部出金を足し戻した金額です。");
   }
   const details = document.createElement("details");
   const title = document.createElement("summary");

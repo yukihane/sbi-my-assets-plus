@@ -12,7 +12,8 @@ const csv = [
 ].join("\n");
 
 test("SBIの一括照会期間・件数・入出金方向を照合する", () => {
-  assert.deepEqual(readStatement(csv, range).map(x => [x.kind, x.yen]), [["deposit", 200000], ["unknown", 120]]);
+  assert.deepEqual(readStatement(csv, range).map(x => [x.kind, x.yen, x.defaulted]),
+    [["deposit", 200000, false], ["withdrawal", 120, true]]);
   for (const bad of [csv.replace(",2,", ",3,"), csv.replace("入金：すべて", "絞り込み"),
     csv.replace("2040/01/31", "2040/01/30"), csv.replace(",120,0", ",120,120"), "<html>Login</html>"]) {
     assert.throws(() => readStatement(bad, range));

@@ -51,7 +51,9 @@ test("明細ゼロ、範囲不正、日付不正、重複評価日", () => {
 
 test("CSVの引用符、BOM、未知の摘要、不正な金額", () => {
   assert.equal(readFlows("\uFEFF" + sampleCsv, layout).length, 5);
-  assert.equal(readFlows(sampleCsv.replace("外部出金", "不明"), layout)[2].kind, "unknown");
+  const fallback = readFlows(sampleCsv.replaceAll("外部入金", "不明").replaceAll("外部出金", "不明"), layout);
+  assert.deepEqual(fallback.map(row => row.kind), ["deposit", "deposit", "withdrawal", "internal", "internal"]);
+  assert.equal(analyze(valuations, fallback, coverage).points.at(-1).adjustedValue, 1030800);
   assert.throws(() => readFlows(sampleCsv.replace("50000", "5O000"), layout));
   assert.throws(() => readFlows(sampleCsv.replace(",,50000", ",1,50000"), layout));
   assert.throws(() => readFlows(sampleCsv.replace("摘要", "内容"), layout));

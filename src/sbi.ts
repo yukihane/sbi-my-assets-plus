@@ -11,7 +11,16 @@ function classify(category: string, detail: string, incoming: boolean): FlowKind
   return "unknown";
 }
 
-export type Statement = Flow & { description: string; incoming: boolean };
+export type Statement = Flow & { description: string; incoming: boolean; defaulted: boolean };
+
+function statement(date: string, amount: number, category: string, detail: string, incoming: boolean): Statement {
+  const classification = classify(category, detail, incoming);
+  const direction = incoming ? "deposit" : "withdrawal";
+  return {
+    date, yen: amount, incoming, description: category + "／" + detail,
+    kind: classification === "unknown" ? direction : classification, defaulted: classification === "unknown"
+  };
+}
 
 export function readStatement(csv: string, requested: Coverage): Statement[] {
   const rows = csvRows(csv);
@@ -50,7 +59,7 @@ export function readStatement(csv: string, requested: Coverage): Statement[] {
     } catch {
       throw new Error("入出金明細の金額欄を確認してください。");
     }
-    return { date, yen: amount, incoming, kind: classify(category, detail, incoming), description: category + "／" + detail };
+    return statement(date, amount, category, detail, incoming);
   });
 }
 
@@ -95,8 +104,7 @@ export function readStatementPage(data: unknown, range: Coverage, number: number
     }
     const incoming = row.payDepKbn === "入金";
     const detail = row.dispAbstract.replace(/<br\s*\/?\s*>/gi, " ").replace(/\s+/gu, " ").trim();
-    return { date, yen: amount, incoming, kind: classify(row.detailKbn, detail, incoming),
-      description: row.detailKbn + "／" + detail };
+    return statement(date, amount, row.detailKbn, detail, incoming);
   });
   return { total, rows };
 }

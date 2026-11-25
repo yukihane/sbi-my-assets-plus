@@ -41,37 +41,26 @@ export function mountLive(root: ShadowRoot, form: HTMLFormElement, scope: HTMLSe
     }
     const analysis = analyze(history, full ? entries : [], full ? coverage : null);
     output.replaceChildren(results(analysis));
-    if (analysis.points.at(-1)?.status === "unclassified") {
-      const classify = document.createElement("button");
-      classify.textContent = "未分類の明細を選んで再計算";
-      classify.addEventListener("click", () => {
-        review.open = true;
-        review.querySelector<HTMLSelectElement>('select:has(option[value="unknown"]:checked)')?.focus();
-        review.scrollIntoView({ block: "start" });
-      });
-      output.prepend(classify);
-    }
     if (!full) output.prepend("この集計対象では資金移動の分類が未確認のため、評価額のみ表示します。");
     else if (coverage) output.prepend(`明細期間 ${coverage.start} ～ ${coverage.end}。入出金日で集計した参考値です。円貨明細に含まれない外部資金移動は反映されません。`);
   }
   function buildReview() {
     const groups = new Map<string, Statement[]>();
     for (const row of entries) {
-      if (row.kind !== "unknown") continue;
+      if (!row.defaulted) continue;
       const key = (row.incoming ? "入金 " : "出金 ") + row.description;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(row);
     }
     if (!groups.size) return;
     const title = document.createElement("summary");
-    title.textContent = "未分類の明細を確認（同じ区分・摘要に一括適用）";
+    title.textContent = "外部入出金として扱う明細の分類を変更（同じ区分・摘要に一括適用）";
     review.append(title);
     for (const [key, group] of groups) {
       const label = document.createElement("label");
       const select = document.createElement("select");
-      select.add(new Option("未分類", "unknown"));
-      select.add(new Option("対象内の取引", "internal"));
       select.add(new Option(group[0].incoming ? "外部入金" : "外部出金", group[0].incoming ? "deposit" : "withdrawal"));
+      select.add(new Option("純入金額に含めない", "internal"));
       select.addEventListener("change", () => {
         for (const row of group) row.kind = select.value as FlowKind;
         render();

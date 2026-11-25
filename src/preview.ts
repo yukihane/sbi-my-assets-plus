@@ -17,8 +17,10 @@ function mountPanel(container: HTMLElement, preview: boolean) {
       dl {display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem}
       dl div {border-top:2px solid #d3dfdf;padding-top:.4rem}
       dt {font-size:.85rem} dd {margin:0;font-size:1.25rem;font-weight:600}
-      figure {margin:1.5rem 0} figcaption span {border-left:4px solid;padding:0 .6rem}
-      canvas {width:100%;height:auto} summary {cursor:pointer}
+      figure {margin:1.5rem 0} figcaption {display:flex;flex-wrap:wrap;gap:.35rem 1.2rem}
+      figcaption span {display:inline-flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+      figcaption canvas {width:56px;height:18px} figcaption strong {font-variant-numeric:tabular-nums}
+      canvas[role=img] {width:100%;height:auto} summary {cursor:pointer}
       table {width:100%;border-collapse:collapse} td,th {padding:.35rem;border-bottom:1px solid #ddd;text-align:right}
       [role=alert] {color:#953020} p:empty {display:none}
     </style>
