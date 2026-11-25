@@ -16,4 +16,4 @@ pnpm build
 
 Windows 11でビルド後に `node scripts/check-preview.mjs` を実行すると、インストール済みのChromeとFirefoxを一時プロファイルで開き、グラフ表示とCSV再取込を検証します。標準以外の場所にある場合は `CHROME_PATH` と `FIREFOX_PATH` に実行ファイルのパスを指定してください。
 
-ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。開発版をTampermonkeyに入れ、My資産の `https://site.sbisec.co.jp/account/assets` を再読み込みすると、ページ下部の「運用成績（UserScript）」で保存済みの評価額JSONを選べます。ローカルプレビューでも同じJSONを選択できます。「日別明細」の評価日と金額を公式グラフの同じ日と照合してください。実際の評価額に対する入出金調整は明細の分類が確定するまで保留します。GitHub Releasesからの配布要件は[実装計画](./doc/implementation-plan.md)に記載しています。
+ビルド成果物は `dist/sbi-my-assets-plus.user.js` です。開発版をTampermonkeyに入れ、My資産の `https://site.sbisec.co.jp/account/assets` を再読み込みすると、ページ下部の「運用成績（UserScript）」で保存済みの評価額JSONを選べます。ローカルプレビューでも同じJSONを選択できます。「集計対象」を公式グラフの表示設定に合わせ、「日別明細」の同じ評価日の金額を照合してください。たとえば両方を非表示にしている場合は「預り金・iDeCoを除外」を選びます。実際の評価額に対する入出金調整は明細の分類が確定するまで保留します。GitHub Releasesからの配布要件は[実装計画](./doc/implementation-plan.md)に記載しています。

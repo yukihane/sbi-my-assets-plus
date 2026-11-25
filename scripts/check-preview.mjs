@@ -34,7 +34,8 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       const input = document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("input[name=json]");
       const files = new DataTransfer();
       const balances = [[Date.parse("2040-01-01T00:00:00+09:00"), 765432]];
-      files.items.add(new File([JSON.stringify({ balances })], "fixture.json"));
+      const balancesWithoutDepositAndIdeco = [[balances[0][0], 4000]];
+      files.items.add(new File([JSON.stringify({ balances, balancesWithoutDepositAndIdeco })], "fixture.json"));
       input.files = files.files;
       input.dispatchEvent(new Event("change"));
     });
@@ -43,6 +44,13 @@ for (const [name, executablePath] of Object.entries(browsers)) {
       return root.querySelector("tbody tr")?.textContent.includes("2040-01-01");
     });
     assert.deepEqual(await read(), { profit: "—", charts: 2, rows: 1, error: "" });
+    await page.evaluate(() => {
+      const select = document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("[name=scope]");
+      select.value = "balancesWithoutDepositAndIdeco";
+      select.dispatchEvent(new Event("change"));
+    });
+    await page.waitForFunction(() =>
+      document.querySelector("#sbi-my-assets-plus").shadowRoot.querySelector("tbody td:nth-child(2)")?.textContent === "4,000 円");
     // Serve a local fixture at the target URL. No request goes to the real site.
     await page.setRequestInterception(true);
     page.on("request", request => {

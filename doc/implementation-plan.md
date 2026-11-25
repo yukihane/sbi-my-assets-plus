@@ -6,7 +6,7 @@ MVPの対象環境は、Windows 11上のFirefoxとGoogle Chromeの両方とす�
 
 ## 1. 最初の作業 — 取得できるデータと画面の確認
 
-対象画面は `https://site.sbisec.co.jp/account/assets`、観測済みの読取先は同一オリジンの `GET /account/api/assets/valuations`。保存した応答では `balances` の各行が「Unix時刻（ミリ秒）、円評価額」の組で、金額は同じキーの `valuationsTransitions[t].ALL.valuation` と一致した。評価日は日本時間に変換する。預り金・iDeCoの除外系列もあるため、最初の実装では基本系列の `balances` を使う。開発版は利用者が選択したファイルから評価額を読み取る。評価日の締め時刻と入出金の対応、サイトからの直接取得、グラフ直下の挿入位置は引き続き確認する。
+対象画面は `https://site.sbisec.co.jp/account/assets`、観測済みの読取先は同一オリジンの `GET /account/api/assets/valuations`。保存した応答では `balances` の各行が「Unix時刻（ミリ秒）、円評価額」の組で、金額は同じキーの `valuationsTransitions[t].ALL.valuation` と一致した。評価日は日本時間に変換する。照合時の集計対象は4種類から選ぶ。預り金の除外には `balancesWithoutDeposit`、iDeCoの除外には `balancesWithoutIdeco`、両方の除外には `balancesWithoutDepositAndIdeco` を使う。各系列の金額は、対応する除外条件の `valuationsTransitions` 系列の `ALL.valuation` と照合済み。開発版は利用者が選択したファイルから評価額を読み取る。評価日の締め時刻と入出金の対応、サイトからの直接取得、グラフ直下の挿入位置は引き続き確認する。
 
 円貨入出金明細CSVには照会条件の前置きと合計欄があり、その後に「入出金日・取引・区分・摘要・出金額・入金額」の表が続く。片側がゼロの金額欄、照会条件による絞り込み、摘要と区分の組み合わせを考慮して実明細用アダプターを実装する。実ファイルはGit管理外の `realdata/` に置く。
 

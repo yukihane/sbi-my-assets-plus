@@ -1,13 +1,22 @@
 import type { Valuation } from "./analytics.ts";
 
-export function readValuations(data: unknown): Valuation[] {
-  if (typeof data !== "object" || data === null || !("balances" in data) || !Array.isArray(data.balances)) {
-    throw new Error("評価額JSONに balances 配列がありません。");
+export const balanceSeries = [
+  { key: "balances", label: "預り金・iDeCoを含む" },
+  { key: "balancesWithoutDeposit", label: "預り金を除外" },
+  { key: "balancesWithoutIdeco", label: "iDeCoを除外" },
+  { key: "balancesWithoutDepositAndIdeco", label: "預り金・iDeCoを除外" }
+] as const;
+
+export function readValuations(data: unknown, key: typeof balanceSeries[number]["key"] = "balances"): Valuation[] {
+  const rows: unknown = data !== null && typeof data === "object" && Object.hasOwn(data, key)
+    ? (data as Record<string, unknown>)[key] : undefined;
+  if (!Array.isArray(rows)) {
+    throw new Error(`評価額JSONに ${key} 配列がありません。`);
   }
 
   const dates = new Set<string>();
-  const points = data.balances.map((row: unknown): Valuation => {
-    if (!Array.isArray(row) || row.length !== 2) throw new Error("balances の行形式を確認してください。");
+  const points = rows.map((row: unknown): Valuation => {
+    if (!Array.isArray(row) || row.length !== 2) throw new Error(`${key} の行形式を確認してください。`);
     const [timestamp, yen] = row;
     if (!Number.isSafeInteger(timestamp) || timestamp < 1e12 || timestamp >= 1e13) {
       throw new Error("評価日のタイムスタンプが不正です。");

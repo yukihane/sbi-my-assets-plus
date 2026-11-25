@@ -1,7 +1,7 @@
 import { analyze } from "./analytics.ts";
 import { decodeCsv, readFlows } from "./csv.ts";
 import { results } from "./panel.ts";
-import { readValuations } from "./valuations.ts";
+import { balanceSeries, readValuations } from "./valuations.ts";
 import { coverage, layout, sampleCsv, valuations } from "./preview-data.ts";
 
 function mountPanel(container: HTMLElement, preview: boolean) {
@@ -26,6 +26,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
     <form>
       <fieldset><legend>評価額の照合</legend>
         <label>My資産の評価額JSON <input name="json" type="file" accept=".json,application/json"></label>
+        <label>集計対象 <select name="scope" disabled></select></label>
         <small>選択すると実際の評価額を表示します。テスト明細は使用しません。</small>
       </fieldset>
       <fieldset id="sample"><legend>架空データの集計</legend>
@@ -37,6 +38,9 @@ function mountPanel(container: HTMLElement, preview: boolean) {
     </form>
     <p role="alert"></p><div id="results"></div>`;
   const form = root.querySelector("form")!;
+  const scope = form.querySelector("select")!;
+  for (const { key, label } of balanceSeries) scope.add(new Option(label, key));
+  scope.addEventListener("change", () => void refresh());
   if (!preview) {
     root.querySelector("#sample")!.remove();
     root.querySelector("small")!.remove();
@@ -55,6 +59,7 @@ function mountPanel(container: HTMLElement, preview: boolean) {
     output.replaceChildren();
     error.textContent = "";
     const jsonFile = input("json").files?.[0];
+    scope.disabled = !jsonFile;
     try {
       if (jsonFile) {
         let data: unknown;
@@ -63,7 +68,9 @@ function mountPanel(container: HTMLElement, preview: boolean) {
         } catch {
           throw new Error("JSONファイルを読み込めません。形式を確認してください。");
         }
-        if (current === revision) output.replaceChildren(results(analyze(readValuations(data), [], null)));
+        if (current !== revision) return;
+        const history = readValuations(data, balanceSeries[scope.selectedIndex].key);
+        output.replaceChildren(results(analyze(history, [], null)));
         return;
       }
       if (!preview) return;
